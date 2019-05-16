@@ -692,7 +692,8 @@ function user_delete($mode, $user_ids, $retain_username = true)
 		PRIVMSGS_RULES_TABLE,
 		$phpbb_container->getParameter('tables.auth_provider_oauth_token_storage'),
 		$phpbb_container->getParameter('tables.auth_provider_oauth_states'),
-		$phpbb_container->getParameter('tables.auth_provider_oauth_account_assoc')
+		$phpbb_container->getParameter('tables.auth_provider_oauth_account_assoc'),
+		$phpbb_container->getParameter('tables.user_notifications')
 	];
 
 	// Ignore errors on deleting from non-existent tables, e.g. when migrating
@@ -1717,16 +1718,20 @@ function phpbb_validate_timezone($timezone)
 	return (in_array($timezone, phpbb_get_timezone_identifiers($timezone))) ? false : 'TIMEZONE_INVALID';
 }
 
-/**
-* Check to see if the username has been taken, or if it is disallowed.
-* Also checks if it includes the " character, which we don't allow in usernames.
-* Used for registering, changing names, and posting anonymously with a username
-*
-* @param string $username The username to check
-* @param string $allowed_username An allowed username, default being $user->data['username']
-*
-* @return	mixed	Either false if validation succeeded or a string which will be used as the error message (with the variable name appended)
-*/
+/***
+ * Validate Username
+ *
+ * Check to see if the username has been taken, or if it is disallowed.
+ * Also checks if it includes the " character or the 4-bytes Unicode ones
+ * (aka emojis) which we don't allow in usernames.
+ * Used for registering, changing names, and posting anonymously with a username
+ *
+ * @param string	$username				The username to check
+ * @param string	$allowed_username		An allowed username, default being $user->data['username']
+ *
+ * @return mixed							Either false if validation succeeded or a string which will be
+ *											used as the error message (with the variable name appended)
+ */
 function validate_username($username, $allowed_username = false)
 {
 	global $config, $db, $user, $cache;
@@ -1737,6 +1742,14 @@ function validate_username($username, $allowed_username = false)
 	if ($allowed_username == $clean_username)
 	{
 		return false;
+	}
+
+	// The very first check is for
+	// out-of-bounds characters that are currently
+	// not supported by utf8_bin in MySQL
+	if (preg_match('/[\x{10000}-\x{10FFFF}]/u', $username))
+	{
+		return 'INVALID_EMOJIS';
 	}
 
 	// ... fast checks first.
@@ -1929,9 +1942,9 @@ function validate_user_email($email, $allowed_email = false)
 		return $validate_email;
 	}
 
-	if (($ban_reason = $user->check_ban(false, false, $email, true)) !== false)
+	if (($ban = $user->check_ban(false, false, $email, true)) !== false)
 	{
-		return ($ban_reason === true) ? 'EMAIL_BANNED' : $ban_reason;
+		return ($ban === true) ? 'EMAIL_BANNED' : (!empty($ban['ban_give_reason']) ? $ban['ban_give_reason'] : $ban);
 	}
 
 	if (!$config['allow_emailreuse'])

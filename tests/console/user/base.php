@@ -20,6 +20,7 @@ abstract class phpbb_console_user_base extends phpbb_database_test_case
 	protected $log;
 	protected $passwords_manager;
 	protected $command_name;
+	/** @var Symfony\Component\Console\Helper\QuestionHelper */
 	protected $question;
 	protected $user_loader;
 	protected $phpbb_root_path;
@@ -97,6 +98,8 @@ abstract class phpbb_console_user_base extends phpbb_database_test_case
 		$phpbb_container->setParameter('tables.auth_provider_oauth_token_storage', 'phpbb_oauth_tokens');
 		$phpbb_container->setParameter('tables.auth_provider_oauth_states', 'phpbb_oauth_states');
 		$phpbb_container->setParameter('tables.auth_provider_oauth_account_assoc', 'phpbb_oauth_accounts');
+
+		$phpbb_container->setParameter('tables.user_notifications', 'phpbb_user_notifications');
 
 		parent::setUp();
 	}
